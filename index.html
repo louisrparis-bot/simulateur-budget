@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Gestion Budget Foyer</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      background-color: #f9f9f9;
+      color: #333;
+    }
+    h1 { text-align: center; margin-bottom: 10px; }
+    .info { text-align: center; font-size: 0.9rem; color: #555; margin-bottom: 20px; }
+    .section { margin-bottom: 20px; padding: 20px; border-radius: 12px; background: white; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+    label { display: block; margin-top: 10px; }
+    input { margin-top: 5px; padding: 6px; width: 200px; }
+    .results { margin-top: 20px; font-weight: bold; }
+    canvas { margin-top: 20px; max-width: 600px; }
+    button { margin-top: 10px; padding: 8px 12px; border: none; border-radius: 6px; background: #2c3e50; color: white; cursor: pointer; }
+    button:hover { background: #1a242f; }
+  </style>
+</head>
+<body>
+  <h1>Gestion du Budget du Foyer</h1>
+  <p class="info">Toutes les modifications sont sauvegardées automatiquement dans votre navigateur. Vous pouvez revenir plus tard et retrouver vos données. Le bouton "Réinitialiser" remet les valeurs par défaut.</p>
+
+  <!-- Salaire net -->
+  <div class="section">
+    <h2>Salaire net après impôts</h2>
+    <label for="netFoyer">Net du foyer (€):</label>
+    <input type="number" id="netFoyer" value="2500">
+  </div>
+
+  <!-- Dépenses -->
+  <div class="section">
+    <h2>Dépenses mensuelles</h2>
+    
+    <h3>Logement</h3>
+    <label>Loyer / Crédit immobilier (€): <input type="number" id="loyer" value="800"></label>
+    <label>Charges de copropriété (€): <input type="number" id="charges" value="100"></label>
+    <label>Taxe Foncière (€): <input type="number" id="fonciere" value="80"></label>
+
+    <h3>Services & Assurances</h3>
+    <label>Box Internet (€): <input type="number" id="internet" value="30"></label>
+    <label>Forfait Téléphone (€): <input type="number" id="tel" value="40"></label>
+    <label>Assurance Responsabilité civile (€): <input type="number" id="assurance" value="20"></label>
+    <label>Mutuelle Santé (€): <input type="number" id="mutuelle" value="100"></label>
+
+    <h3>Transport</h3>
+    <label>Frais voiture (essence, assurance) (€): <input type="number" id="voiture" value="150"></label>
+    <label>Transports en commun (€): <input type="number" id="transports" value="60"></label>
+
+    <h3>Alimentation</h3>
+    <label>Courses (€): <input type="number" id="courses" value="400"></label>
+
+    <h3>Éducation / Enfants</h3>
+    <label>Frais de scolarité (€): <input type="number" id="scolarite" value="0"></label>
+    <label>Garde d'enfants (€): <input type="number" id="garde" value="0"></label>
+
+    <h3>Santé</h3>
+    <label>Frais médicaux non remboursés (€): <input type="number" id="medicaux" value="0"></label>
+
+    <h3>Loisirs & Abonnements</h3>
+    <label>Loisirs (€): <input type="number" id="loisirs" value="150"></label>
+    <label>Abonnements divers (€): <input type="number" id="abonnements" value="0"></label>
+
+    <h3>Crédits</h3>
+    <label>Crédit à la consommation / prêts personnels (€): <input type="number" id="credits" value="0"></label>
+
+    <h3>Autres</h3>
+    <label>Autres (€): <input type="number" id="autres" value="100"></label>
+
+    <button onclick="reinitialiser()">♻️ Réinitialiser</button>
+  </div>
+
+  <!-- Épargne -->
+  <div class="section results">
+    <p>Épargne actuelle : <span id="epargne">0</span> € (<span id="epargnePercent">0</span> %)</p>
+  </div>
+
+  <!-- Graphiques -->
+  <div class="section">
+    <h2>Graphiques</h2>
+    <canvas id="barChart"></canvas>
+    <canvas id="pieChart"></canvas>
+  </div>
+
+  <script>
+    const netFoyerInput = document.getElementById("netFoyer");
+    const depenseIds = ["loyer","charges","fonciere","internet","tel","assurance","mutuelle","voiture","transports","courses","scolarite","garde","medicaux","loisirs","abonnements","credits","autres"];
+    const depenseInputs = depenseIds.map(id => document.getElementById(id));
+    const epargneEl = document.getElementById("epargne");
+    const epargnePercentEl = document.getElementById("epargnePercent");
+
+    const ctxBar = document.getElementById('barChart').getContext('2d');
+    const ctxPie = document.getElementById('pieChart').getContext('2d');
+
+    let barChart = new Chart(ctxBar, {
+      type: 'bar',
+      data: {
+        labels: ['Net après impôts (€)', 'Dépenses totales (€)', 'Épargne (€)'],
+        datasets: [{
+          label: 'Budget du foyer',
+          data: [0,0,0],
+          backgroundColor: ['#2c3e50','#c0392b','#27ae60']
+        }]
+      },
+      options: { scales: { y: { title: { display: true, text: '€' } } } }
+    });
+
+    let pieChart = new Chart(ctxPie, {
+      type: 'pie',
+      data: {
+        labels: ['Loyer','Charges','Taxe Foncière','Internet','Téléphone','Assurance RC','Mutuelle','Voiture','Transports','Courses','Scolarité','Garde enfants','Frais médicaux','Loisirs','Abonnements','Crédits','Autres'],
+        datasets: [{
+          data: Array(depenseIds.length).fill(0),
+          backgroundColor: ['#1abc9c','#3498db','#9b59b6','#f39c12','#e74c3c','#2ecc71','#e67e22','#34495e','#16a085','#95a5a6','#d35400','#7f8c8d','#c0392b','#27ae60','#8e44ad','#2980b9','#7f8c8d']
+        }]
+      }
+    });
+
+    function updateAll(){
+      const net = parseFloat(netFoyerInput.value) || 0;
+      const depenses = depenseInputs.map(input => parseFloat(input.value) || 0);
+      const totalDepenses = depenses.reduce((a,b)=>a+b,0);
+      const epargne = net - totalDepenses;
+      const epargnePercent = net > 0 ? ((epargne/net)*100).toFixed(1) : 0;
+
+      epargneEl.textContent = epargne.toFixed(2);
+      epargnePercentEl.textContent = epargnePercent;
+
+      barChart.data.datasets[0].data = [net, totalDepenses, epargne];
+      barChart.update();
+
+      pieChart.data.datasets[0].data = depenses;
+      pieChart.update();
+
+      sauvegarder();
+    }
+
+    function sauvegarder(){
+      const data = { net: netFoyerInput.value };
+      depenseInputs.forEach((input,i)=> data[depenseIds[i]] = input.value);
+      localStorage.setItem("budgetFoyer", JSON.stringify(data));
+    }
+
+    function reinitialiser(){
+      localStorage.removeItem("budgetFoyer");
+      netFoyerInput.value = 2500;
+      const defaultValues = [800,100,80,30,40,20,100,150,60,400,0,0,0,150,0,0,100];
+      depenseInputs.forEach((input,i)=> input.value = defaultValues[i]);
+      updateAll();
+    }
+
+    function charger(){
+      const saved = localStorage.getItem("budgetFoyer");
+      if(saved){
+        const data = JSON.parse(saved);
+        netFoyerInput.value = data.net || 2500;
+        depenseInputs.forEach((input,i)=> input.value = data[depenseIds[i]] || input.value);
+      }
+    }
+
+    netFoyerInput.addEventListener("input", updateAll);
+    depenseInputs.forEach(input => input.addEventListener("input", updateAll));
+
+    // Initialisation
+    charger();
+    updateAll();
+  </script>
+</body>
+</html>
